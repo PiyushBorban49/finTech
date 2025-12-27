@@ -18,16 +18,7 @@ const GazeDebugger = ({ zones }) => {
   };
 
   // Hide default cursor when simulating with mouse
-  useEffect(() => {
-    if (isMouseSim) {
-      document.body.style.cursor = 'none';
-    } else {
-      document.body.style.cursor = 'default';
-    }
-    return () => {
-      document.body.style.cursor = 'default';
-    };
-  }, [isMouseSim]);
+
 
   return (
     <>

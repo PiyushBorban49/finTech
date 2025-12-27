@@ -5,7 +5,7 @@ const GazeContext = createContext();
 
 export const GazeProvider = ({ children }) => {
   const [gaze, setGaze] = useState({ x: 0, y: 0, timestamp: 0 });
-  const [isMouseSim, setIsMouseSim] = useState(true);
+  const [isMouseSim, setIsMouseSim] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
 
   // Refs for MediaPipe and Video management
@@ -15,6 +15,7 @@ export const GazeProvider = ({ children }) => {
   const streamRef = useRef(null); // To stop webcam
   const lastVideoTimeRef = useRef(-1);
   const lastTimestampRef = useRef(-1);
+  const prevGazeRef = useRef({ x: 0, y: 0 });
 
   // --- MOUSE SIMULATION ---
   useEffect(() => {
@@ -89,6 +90,11 @@ export const GazeProvider = ({ children }) => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    if (faceLandmarkerRef.current) {
+      faceLandmarkerRef.current.close();
+      faceLandmarkerRef.current = null;
+      setIsModelLoaded(false);
+    }
   };
 
   const predictWebcam = () => {
@@ -100,8 +106,10 @@ export const GazeProvider = ({ children }) => {
       landmarker &&
       video.readyState >= 2 && // HAVE_CURRENT_DATA
       video.videoWidth > 0 &&
+      video.videoHeight > 0 &&
       !video.paused &&
-      !video.ended
+      !video.ended &&
+      landmarker // Extra check
     ) {
       // Avoid processing the same frame multiple times
       if (video.currentTime !== lastVideoTimeRef.current) {
@@ -131,14 +139,20 @@ export const GazeProvider = ({ children }) => {
 
             // --- 3. Define Active Zone (Sensitivity Box) ---
             // Adjust these to make it easier/harder to reach corners
-            const boxWidth = 0.25;  // 25% of camera width
-            const boxHeight = 0.25; // 25% of camera height
+            // 0.15 is a balanced sensitivity (smaller - more sensitive)
+            const boxWidth = 0.1;
+            const boxHeight = 0.025;
+
+            // Vertical Offset to compensate for "Webcam on Top" angle (Laptop standard).
+            // Positive value shifts the "center" of the screen DOWN in camera space,
+            // which effectively moves the cursor UP for the same eye position.
+            const yOffset = 0.12;
 
             // Center of camera is 0.5, 0.5
             const minX = 0.5 - (boxWidth / 2);
             const maxX = 0.5 + (boxWidth / 2);
-            const minY = 0.5 - (boxHeight / 2);
-            const maxY = 0.5 + (boxHeight / 2);
+            const minY = (0.5) - (boxHeight / 2);
+            const maxY = (0.5 + yOffset) + (boxHeight / 2);
 
             // --- 4. Map to Screen Coordinates ---
             let normalizedX = (avgIrisX - minX) / (maxX - minX);
@@ -148,14 +162,22 @@ export const GazeProvider = ({ children }) => {
             normalizedX = Math.max(0, Math.min(1, normalizedX));
             normalizedY = Math.max(0, Math.min(1, normalizedY));
 
-            // Calculate Screen Pixels (Mirror X)
-            const screenX = (1 - normalizedX) * window.innerWidth;
-            const screenY = normalizedY * window.innerHeight;
+            // Calculate Target Screen Pixels (Mirror X)
+            const targetX = (1 - normalizedX) * window.innerWidth;
+            const targetY = normalizedY * window.innerHeight;
 
-            // --- 5. Update Context State ---
+            // --- 5. Apply Smoothing (Holt's Linear Trend / Simple Lerp) ---
+            const SMOOTHING_FACTOR = 0.1; // 0.1 = Very Smooth, 0.9 = Very Reactive
+
+            const smoothX = prevGazeRef.current.x + (targetX - prevGazeRef.current.x) * SMOOTHING_FACTOR;
+            const smoothY = prevGazeRef.current.y + (targetY - prevGazeRef.current.y) * SMOOTHING_FACTOR;
+
+            prevGazeRef.current = { x: smoothX, y: smoothY };
+
+            // --- 6. Update Context State ---
             setGaze({
-              x: screenX,
-              y: screenY,
+              x: smoothX,
+              y: smoothY,
               // Optional: Calculate Eye Distance for Z-axis
               distance: Math.sqrt(
                 Math.pow((leftIris.x - rightIris.x), 2) +
@@ -165,6 +187,10 @@ export const GazeProvider = ({ children }) => {
           }
         } catch (error) {
           console.error("MediaPipe detection error:", error);
+          // If a fatal error occurs, stop the loop to prevent freezing
+          if (requestRef.current) cancelAnimationFrame(requestRef.current);
+          requestRef.current = null;
+          return;
         }
       }
     }

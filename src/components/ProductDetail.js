@@ -44,7 +44,7 @@ const ProductDetail = ({ onAddToCart }) => {
           <img
             src={product.image}
             alt={product.name}
-            className="w-full h-full object-cover object-center hover:scale-105 transition-transform duration-700"
+            className="w-90% h-90% object-cover object-center hover:scale-105 transition-transform duration-700"
           />
         </div>
 

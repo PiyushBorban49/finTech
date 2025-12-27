@@ -26,6 +26,7 @@ const ProductCard = ({ product, onAddToCart }) => {
     setIsSelecting(true);
   };
 
+  
   const handleIncrement = (e) => {
     e.stopPropagation();
     setQuantity(q => q + 1);

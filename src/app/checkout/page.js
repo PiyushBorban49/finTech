@@ -26,13 +26,45 @@ const SuccessApp = () => {
     const messagesEndRef = useRef(null);
     const [zones, setZones] = useState([]);
     const [showToast, setShowToast] = useState(false);
+    const [cart, setCart] = useState([]);
+    const [totals, setTotals] = useState({ subtotal: 0, tax: 0, serviceFee: 15.50, total: 0 });
+
+    useEffect(() => {
+        const savedCart = localStorage.getItem("supply-cart");
+        if (savedCart) {
+            try {
+                const parsedCart = JSON.parse(savedCart);
+                setCart(parsedCart);
+                const sub = parsedCart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+                const tax = sub * 0.10; // 10% Tax
+                const service = 15.50;
+                setTotals({
+                    subtotal: sub,
+                    tax: tax,
+                    serviceFee: service,
+                    total: sub + tax + service
+                });
+            } catch (e) {
+                console.error("Failed to load cart", e);
+            }
+        }
+    }, []);
 
     // Analytics Data Accumulation
     const startTime = useRef(Date.now());
     const [gazeHistory, setGazeHistory] = useState([]);
     const [confusionLogs, setConfusionLogs] = useState([]);
 
-    const confusion = useConfusionDetector(zones);
+    const rawConfusion = useConfusionDetector(zones);
+    const [lockedConfusion, setLockedConfusion] = useState(null);
+
+    const confusion = lockedConfusion || rawConfusion;
+
+    useEffect(() => {
+        if (!lockedConfusion && rawConfusion.isConfused) {
+            setLockedConfusion(rawConfusion);
+        }
+    }, [rawConfusion, lockedConfusion]);
     const lastConfusionRef = useRef(null);
 
     const handleZoneUpdate = useCallback((newZones) => {
@@ -93,11 +125,21 @@ const SuccessApp = () => {
             const triggerProactiveHelp = async () => {
                 setLoading(true);
                 const proactivePrompt = `
-                  You are a helpful assistant for Clarity Guardian on the Checkout Page.
-                  The user seems confused while looking at the ${confusion.zoneId} section.
-                  Specifically, they seem to be struggling with: ${confusion.reason}.
-                  Simply ask if they have any questions about this specific part.
-                  Keep it short and friendly.
+                 You are a helpful, concise Customer Assistant for an e-commerce checkout. 
+
+        USER CONTEXT:
+        - The user is currently looking at the: "${confusion?.zoneId}" section.
+        - Our eye-tracker detected confusion.
+
+        KNOWLEDGE BASE:
+        1. Terms of Service: I agree to the Terms of Service, including the non-refundable processing fee of $${totals.serviceFee.toFixed(2)}, an estimated 10% tax rate, and automated subscription renewal.
+        2. Price Summary: Subtotal: $${totals.subtotal.toFixed(2)}, Service Fee: $${totals.serviceFee.toFixed(2)}, Tax (10%): $${totals.tax.toFixed(2)}. Total: $${totals.total.toFixed(2)}.
+        3. Cart Items: ${cart.map(i => `${i.name} (Qty: ${i.quantity})`).join(", ")}.
+
+        YOUR GOAL:
+        - Acknowledge what they are looking at (e.g., "I noticed you're looking at the service fee...").
+        - Explain the specific detail they are confused about using the Knowledge Base.
+        - Keep answers under 3 sentences. Be human and direct.
                 `;
                 const systemContext = [{ role: 'system', content: proactivePrompt }];
                 const response = await getGroqChatCompletion([...systemContext, ...messages]);
@@ -117,22 +159,26 @@ const SuccessApp = () => {
         setInputVal("");
         setLoading(true);
 
+
         const contextualPrompt = `
         You are a helpful, concise Customer Assistant for an e-commerce checkout. 
 
         USER CONTEXT:
         - The user is currently looking at the: "${confusion?.zoneId}" section.
-        - Our eye-tracker detected confusion due to: "${confusion?.reason}".
+        - Our eye-tracker detected confusion.
 
         KNOWLEDGE BASE:
-        1. Terms of Service: I agree to the Terms of Service, including the non-refundable processing fee of $12.40 and automated subscription renewal.
-        2. Price Summary: Subtotal: $348.00, Service Fee: $15.50, Tax: $28.71. Total: $392.21.
+        1. Terms of Service: I agree to the Terms of Service, including the non-refundable processing fee of $${totals.serviceFee.toFixed(2)}, an estimated 10% tax rate, and automated subscription renewal.
+        2. Price Summary: Subtotal: $${totals.subtotal.toFixed(2)}, Service Fee: $${totals.serviceFee.toFixed(2)}, Tax (10%): $${totals.tax.toFixed(2)}. Total: $${totals.total.toFixed(2)}.
+        3. Cart Items: ${cart.map(i => `${i.name} (Qty: ${i.quantity})`).join(", ")}.
 
         YOUR GOAL:
         - Acknowledge what they are looking at (e.g., "I noticed you're looking at the service fee...").
         - Explain the specific detail they are confused about using the Knowledge Base.
         - Keep answers under 3 sentences. Be human and direct.
       `;
+
+        // Ensure we are passing the FRESH system context with every new message
         const systemContext = [{ role: 'system', content: contextualPrompt }];
         const response = await getGroqChatCompletion([...systemContext, ...newHistory]);
         setMessages(prev => [...prev, { role: 'assistant', content: response }]);
@@ -193,7 +239,7 @@ const SuccessApp = () => {
                 <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 md:p-8">
 
                     {/* Header */}
-                    <div className="mb-8 text-center bg-white/70 backdrop-blur-md p-6 rounded-3xl shadow-xl border border-white/50 w-full max-w-4xl transform hover:scale-[1.01] transition-transform flex justify-between items-center text-black">
+                    <div className="mb-8 text-center bg-white/10  p-6 rounded-3xl shadow-xl border border-white/50 w-full max-w-4xl transform hover:scale-[1.01] transition-transform flex justify-between items-center text-black">
                         <button onClick={handleBack} className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 hover:text-blue-600 transition-colors">
                             ← Back to Store
                         </button>
@@ -221,6 +267,8 @@ const SuccessApp = () => {
                             onZonesReady={handleZoneUpdate}
                             onPay={handlePay}
                             onBack={handleBack}
+                            cart={cart}
+                            totals={totals}
                         />
 
                         {/* Gaze Reticle Overlay */}
@@ -231,7 +279,7 @@ const SuccessApp = () => {
                     {!needHelp && (
                         <button
                             onClick={() => setNeedHelp(true)}
-                            className="fixed top-8 right-8 bg-white/95 backdrop-blur-md text-blue-600 px-8 py-4 rounded-full shadow-2xl hover:bg-blue-600 hover:text-white transition-all transform hover:-translate-y-1 font-black text-xs uppercase tracking-widest border border-blue-100 flex items-center gap-3 z-30"
+                            className="fixed top-8 right-8 bg-white/10  text-blue-600 px-8 py-4 rounded-full shadow-2xl hover:bg-blue-600 hover:text-white transition-all transform hover:-translate-y-1 font-black text-xs uppercase tracking-widest border border-blue-100 flex items-center gap-3 z-30"
                         >
                             <span className="relative flex h-3 w-3">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -243,29 +291,38 @@ const SuccessApp = () => {
 
                     {/* Help Toast (Delayed) */}
                     {showToast && !needHelp && (
-                        <div className="fixed top-5 left-[50%] translate-x-[-50%] z-[100]">
-                            <div className="bg-white/95 border border-yellow-200 p-8 h-[50px] flex flex-row w-[1000px] rounded-[2.5rem] w-80 shadow-[0_20px_50px_rgba(0,0,0,0.1)] backdrop-blur-xl border-b-4 border-b-yellow-400">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center shadow-inner">
-                                        <span className="text-xl">💡</span>
+                        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-3xl px-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                            <div className="bg-white/90 backdrop-blur-xl border border-yellow-200/50 p-4 rounded-[2rem] shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 border-b-4 border-b-yellow-400">
+
+                                {/* Icon & Title */}
+                                <div className="flex items-center gap-4 min-w-max">
+                                    <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center shadow-inner shrink-0 text-xl animate-bounce">
+                                        💡
                                     </div>
-                                    <p className="font-black text-[10px] uppercase tracking-[0.2em] text-yellow-600">Proactive Insight</p>
+                                    <div className="flex flex-col">
+                                        <p className="font-black text-[10px] uppercase tracking-[0.2em] text-yellow-600">Proactive Insight</p>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">AI Detected Hesitation</p>
+                                    </div>
                                 </div>
-                                <p className="text-sm font-bold text-gray-700 -mt-6 italic leading-relaxed">
-                                    "It looks like you're hesitating on the <span className="text-blue-600">{confusion.reason}</span>. Would you like to clarify this detail?"
+
+                                {/* Message */}
+                                <p className="text-xs font-bold text-gray-700 italic leading-relaxed text-center md:text-left">
+                                    "It looks like you're hesitating on the <span className="text-blue-600 border-b border-blue-200">{confusion.reason}</span>. Would you like to clarify this?"
                                 </p>
-                                <div className="flex gap-3">
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2 shrink-0">
                                     <button
                                         onClick={() => { setNeedHelp(true); setShowToast(false); }}
-                                        className="flex-1 bg-blue-600 -mt-6 h-[50px] items-center text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-blue-100"
+                                        className="bg-blue-600 hover:bg-black text-white px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
                                     >
-                                        Clarify Detail
+                                        Clarify
                                     </button>
                                     <button
                                         onClick={() => setShowToast(false)}
-                                        className="px-5 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-gray-600 transition-colors"
+                                        className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
                                     >
-                                        No Thanks
+                                        <span className="text-lg font-bold">×</span>
                                     </button>
                                 </div>
                             </div>

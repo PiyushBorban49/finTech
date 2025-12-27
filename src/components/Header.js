@@ -56,7 +56,7 @@ const Header = ({ onCartClick, cartCount, setIsOpen: setNavOpen }) => {
   return (
     <>
       {/* Marquee Banner */}
-      <div className="bg-black text-white text-xs py-2 overflow-hidden whitespace-nowrap">
+      {/* <div className="bg-black text-white text-xs py-2 overflow-hidden whitespace-nowrap">
 
         <div
           ref={marqueeRef}
@@ -67,12 +67,12 @@ const Header = ({ onCartClick, cartCount, setIsOpen: setNavOpen }) => {
           NEW COLLECTION DROPPING SOON — FREE SHIPPING ON ORDERS OVER $150 —
           WORLDWIDE SHIPPING AVAILABLE — NEW COLLECTION DROPPING SOON —
         </div>
-      </div>
+      </div> */}
 
       {/* Main Navbar */}
       <header
         ref={headerRef}
-        className="sticky top-0 z-40 bg-white border-b border-gray-200"
+        className="sticky top-0 z-40 bg-white/10 backdrop-blur-xl border-b border-white/50"
       >
         <div className="flex justify-between items-center h-16 px-4 md:px-6">
 
@@ -114,7 +114,7 @@ const Header = ({ onCartClick, cartCount, setIsOpen: setNavOpen }) => {
               href="/"
               className="text-xl font-bold tracking-tight uppercase text-black"
             >
-              Supply
+              Clarity Guardian
             </a>
           </div>
 

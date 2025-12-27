@@ -18,7 +18,7 @@ const CartDrawer = ({ isOpen, onClose, cartItems, onRemoveItem, onUpdateQuantity
 
     setIsCheckingOut(true);
     setTimeout(() => {
-      window.location.href = "/checkout";
+      window.location.href = "/calibrate";
     }, 1000);
   };
 

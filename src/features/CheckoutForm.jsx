@@ -2,16 +2,12 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 
-const CheckoutForm = ({ onZonesReady, confusion, onPay, onBack }) => {
+const CheckoutForm = ({ onZonesReady, confusion, onPay, onBack, cart = [], totals = { subtotal: 0, tax: 0, serviceFee: 0, total: 0 } }) => {
   const priceRef = useRef(null);
   const termsRef = useRef(null);
   const payRef = useRef(null);
 
-  // --- Real Product Math (matching your Shop page) ---
-  const subtotal = 348.00;
-  const taxAmount = 28.71;
-  const serviceFee = 15.50;
-  const totalAmount = subtotal + taxAmount + serviceFee;
+  const { subtotal, tax: taxAmount, serviceFee, total: totalAmount } = totals;
 
   const updateZones = useCallback(() => {
     if (priceRef.current && termsRef.current && payRef.current) {
@@ -42,7 +38,7 @@ const CheckoutForm = ({ onZonesReady, confusion, onPay, onBack }) => {
 
   const getHighlightClass = (id) =>
     confusion?.isConfused && confusion.zoneId === id
-      ? "ring-4 ring-yellow-400 ring-offset-2 transition-all duration-500 shadow-2xl scale-[1.02] z-10 relative bg-white"
+      ? "ring-4 ring-yellow-400 ring-offset-2 transition-all duration-500 shadow-2xl scale-[1.02] z-10 relative "
       : "transition-all duration-500";
 
   return (
@@ -61,22 +57,22 @@ const CheckoutForm = ({ onZonesReady, confusion, onPay, onBack }) => {
 
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Cardholder Name</label>
+              <label className="text-[10px] font-bold text-black uppercase tracking-widest ml-1">Cardholder Name</label>
               <input type="text" placeholder="JOHN DOE" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none font-bold text-sm placeholder:text-gray-200 transition-all" />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Card Number</label>
+              <label className="text-[10px] font-bold text-black uppercase tracking-widest ml-1">Card Number</label>
               <input type="text" placeholder="0000 0000 0000 0000" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none font-bold text-sm placeholder:text-gray-200 transition-all" />
             </div>
 
             <div className="flex gap-4">
               <div className="w-1/2 space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Expiry</label>
+                <label className="text-[10px] font-bold text-black uppercase tracking-widest ml-1">Expiry</label>
                 <input type="text" placeholder="MM/YY" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none font-bold text-sm" />
               </div>
               <div className="w-1/2 space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">CVC</label>
+                <label className="text-[10px] font-bold text-black uppercase tracking-widest ml-1">CVC</label>
                 <input type="text" placeholder="123" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 outline-none font-bold text-sm" />
               </div>
             </div>
@@ -98,7 +94,7 @@ const CheckoutForm = ({ onZonesReady, confusion, onPay, onBack }) => {
                 </div>
               </div>
               <span className="text-[11px] text-gray-400 font-bold leading-relaxed uppercase group-hover:text-gray-600 transition-colors">
-                I agree to the <span className="text-blue-600 underline">Terms</span>, including the non-refundable processing fee of <span className="text-black">$12.40</span> and automated renewal.
+                I agree to the <span className="text-blue-600 underline">Terms</span>, including the non-refundable processing fee of <span className="text-black">${serviceFee.toFixed(2)}</span>, plus 10% estimated tax, and automated renewal.
               </span>
             </label>
           </div>
@@ -109,17 +105,28 @@ const CheckoutForm = ({ onZonesReady, confusion, onPay, onBack }) => {
           <div className="space-y-10">
             <div className="flex justify-between items-center">
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Order Summary</h3>
-              <span className="bg-gray-200 text-[10px] font-bold px-2 py-1 rounded text-gray-600">3 ITEMS</span>
+              <span className="bg-gray-200 text-[10px] font-bold px-2 py-1 rounded text-gray-600">{cart.length} ITEMS</span>
             </div>
 
-            {/* ZONE: Price Summary */}
             <div
               ref={priceRef}
               id="price-summary"
               className={`space-y-5 p-2 rounded-2xl ${getHighlightClass('price-summary')}`}
             >
-              <div className="flex justify-between items-center group">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sony WH-1000XM5</span>
+              {cart.map((item, index) => (
+                <div key={index} className="flex justify-between items-center group">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{item.name}</span>
+                    <span className="text-[9px] text-gray-300 font-bold uppercase tracking-widest">Qty: {item.quantity}</span>
+                  </div>
+                  <span className="font-black text-sm text-gray-900">${(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+
+              <div className="w-full h-px bg-gray-100 my-4" />
+
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Subtotal</span>
                 <span className="font-black text-sm text-gray-900">${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
@@ -161,7 +168,7 @@ const CheckoutForm = ({ onZonesReady, confusion, onPay, onBack }) => {
             >
               Complete Order Transaction
             </button>
-            <p className="text-[9px] text-center text-gray-300 font-bold uppercase mt-4 tracking-widest">
+            <p className="text-[9px] text-center text-gray-600 font-bold uppercase mt-4 tracking-widest">
               Encrypted by Clarity Shield™
             </p>
           </div>

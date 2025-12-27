@@ -53,7 +53,7 @@ export default function ValidationDashboard() {
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-                            Validation<span className="text-blue-600">Dashboard</span>
+                           Clarity <span className="text-blue-600">Guardian</span> Validation<span className="text-blue-600">Dashboard</span>
                         </h1>
                         <p className="text-sm font-medium text-gray-500 mt-1 text-black">
                             Empirical Eye-Tracking Analytics
