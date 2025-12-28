@@ -52,7 +52,7 @@ export default function Page() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
-  // Load cart from localStorage
+
   useEffect(() => {
     const saved = localStorage.getItem("supply-cart");
     if (saved) {
@@ -64,7 +64,7 @@ export default function Page() {
     }
   }, []);
 
-  // Save cart to localStorage
+
   useEffect(() => {
     localStorage.setItem("supply-cart", JSON.stringify(cart));
   }, [cart]);
@@ -106,84 +106,95 @@ export default function Page() {
   return (
     <>
 
-      <div className="min-h-screen bg-white flex flex-col relative">
+      <div className="min-h-screen relative flex flex-col">
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <video
+            src="/Planet_Video.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload='auto'
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-white/10 backdrop-blur-xl" />
+        </div>
 
-        {/* HEADER */}
-        <Header
-          onCartClick={() => setIsCartOpen(true)}
-          cartCount={cartCount}
-          setIsOpen={setIsOpen}
-        />
+        <div className="relative z-10 flex flex-col min-h-screen">
+
+          <Header
+            onCartClick={() => setIsCartOpen(true)}
+            cartCount={cartCount}
+            setIsOpen={setIsOpen}
+          />
 
 
-        {/* MAIN SHOP PAGE */}
-        <main className="grow bg-white">
-          <Shop onAddToCart={addToCart} />
-        </main>
+          <main className="grow bg-white/10 ">
+            <Shop onAddToCart={addToCart} />
+          </main>
 
-        {/* FOOTER */}
-        <footer className="bg-white border-t border-gray-200 py-12 md:py-20 text-black">
-          <div className="px-4 md:px-6 max-w-screen-2xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-            <div className="space-y-4">
-              <h4 className="font-bold uppercase tracking-wide text-sm">
-                About
-              </h4>
-              <ul className="space-y-2 text-sm text-gray-500">
-                <li><a href="#" className="hover:text-black">Our Story</a></li>
-                <li><a href="#" className="hover:text-black">Careers</a></li>
-                <li><a href="#" className="hover:text-black">Press</a></li>
-              </ul>
-            </div>
+          <footer className="bg-white/10 py-12 md:py-20 text-black">
+            <div className="px-4 md:px-6 max-w-screen-2xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+              <div className="space-y-4">
+                <h4 className="font-bold uppercase tracking-wide text-sm">
+                  About
+                </h4>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li><a href="#" className="hover:text-black">Our Story</a></li>
+                  <li><a href="#" className="hover:text-black">Careers</a></li>
+                  <li><a href="#" className="hover:text-black">Press</a></li>
+                </ul>
+              </div>
 
-            <div className="space-y-4">
-              <h4 className="font-bold uppercase tracking-wide text-sm">
-                Support
-              </h4>
-              <ul className="space-y-2 text-sm text-gray-500">
-                <li><a href="#" className="hover:text-black">FAQ</a></li>
-                <li><a href="#" className="hover:text-black">Shipping & Returns</a></li>
-                <li><a href="#" className="hover:text-black">Contact</a></li>
-              </ul>
-            </div>
+              <div className="space-y-4">
+                <h4 className="font-bold uppercase tracking-wide text-sm">
+                  Support
+                </h4>
+                <ul className="space-y-2 text-sm text-gray-500">
+                  <li><a href="#" className="hover:text-black">FAQ</a></li>
+                  <li><a href="#" className="hover:text-black">Shipping & Returns</a></li>
+                  <li><a href="#" className="hover:text-black">Contact</a></li>
+                </ul>
+              </div>
 
-            <div className="col-span-1 md:col-span-2 space-y-4">
-              <h4 className="font-bold uppercase tracking-wide text-sm">
-                Newsletter
-              </h4>
-              <p className="text-sm text-gray-500">
-                Subscribe for updates, new drops, and insider offers.
-              </p>
+              <div className="col-span-1 md:col-span-2 space-y-4">
+                <h4 className="font-bold uppercase tracking-wide text-sm">
+                  Newsletter
+                </h4>
+                <p className="text-sm text-gray-500">
+                  Subscribe for updates, new drops, and insider offers.
+                </p>
 
-              <div className="flex gap-2 max-w-md">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 bg-gray-50 border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:border-black transition-colors"
-                />
-                <button className="bg-black text-white px-6 py-2 text-sm font-bold uppercase hover:bg-gray-800 transition-colors">
-                  Join
-                </button>
+                <div className="flex gap-2 max-w-md">
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    className="flex-1 bg-gray-50 border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:border-black transition-colors"
+                  />
+                  <button className="bg-black text-white px-6 py-2 text-sm font-bold uppercase hover:bg-gray-800 transition-colors">
+                    Join
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-16 px-4 md:px-6 border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-gray-400">
-            <p>&copy; 2026 Piyush Borban</p>
-            <div className="flex gap-4 mt-4 md:mt-0">
-              <a href="#" className="hover:text-black">Privacy Policy</a>
-              <a href="#" className="hover:text-black">Terms of Service</a>
+            <div className="mt-16 px-4 md:px-6 border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center text-xs text-gray-400">
+              <p>&copy; 2026 Piyush Borban</p>
+              <div className="flex gap-4 mt-4 md:mt-0">
+                <a href="#" className="hover:text-black">Privacy Policy</a>
+                <a href="#" className="hover:text-black">Terms of Service</a>
+              </div>
             </div>
-          </div>
-        </footer>
+          </footer>
 
-        {/* CART DRAWER */}
-        <CartDrawer
-          isOpen={isCartOpen}
-          onClose={() => setIsCartOpen(false)}
-          cartItems={cart}
-          onRemoveItem={removeFromCart}
-          onUpdateQuantity={updateQuantity}
-        />
+          <CartDrawer
+            isOpen={isCartOpen}
+            onClose={() => setIsCartOpen(false)}
+            cartItems={cart}
+            onRemoveItem={removeFromCart}
+            onUpdateQuantity={updateQuantity}
+          />
+        </div>
       </div>
     </>
   );

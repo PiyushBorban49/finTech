@@ -5,18 +5,20 @@ const GazeContext = createContext();
 
 export const GazeProvider = ({ children }) => {
   const [gaze, setGaze] = useState({ x: 0, y: 0, timestamp: 0 });
-  const [isMouseSim, setIsMouseSim] = useState(true);
+  const [isMouseSim, setIsMouseSim] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
+  const [webcamStream, setWebcamStream] = useState(null);
 
-  // Refs for MediaPipe and Video management
+
   const videoRef = useRef(null);
   const faceLandmarkerRef = useRef(null);
-  const requestRef = useRef(null); // To cancel animation frame
-  const streamRef = useRef(null); // To stop webcam
+  const requestRef = useRef(null);
+  const streamRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
   const lastTimestampRef = useRef(-1);
+  const prevGazeRef = useRef({ x: 0, y: 0 });
 
-  // --- MOUSE SIMULATION ---
+
   useEffect(() => {
     if (isMouseSim) {
       const handleMouseMove = (e) => {
@@ -24,15 +26,15 @@ export const GazeProvider = ({ children }) => {
       };
       window.addEventListener('mousemove', handleMouseMove);
 
-      // Cleanup
+
       return () => {
         window.removeEventListener('mousemove', handleMouseMove);
-        stopEyeTracking(); // Ensure camera stops if we switch modes
+        stopEyeTracking();
       };
     }
   }, [isMouseSim]);
 
-  // --- EYE TRACKING LOGIC ---
+
   useEffect(() => {
     if (!isMouseSim) {
       startEyeTracking();
@@ -43,7 +45,7 @@ export const GazeProvider = ({ children }) => {
   }, [isMouseSim]);
 
   const startEyeTracking = async () => {
-    // 1. Load Model if not already loaded
+
     if (!faceLandmarkerRef.current) {
       try {
         const filesetResolver = await FilesetResolver.forVisionTasks(
@@ -65,13 +67,19 @@ export const GazeProvider = ({ children }) => {
       }
     }
 
-    // 2. Start Webcam
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn("Camera API not available. Ensure you are on HTTPS or localhost.");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       streamRef.current = stream;
+      setWebcamStream(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Wait for metadata to ensure dimensions are ready
+
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play();
           if (requestRef.current) cancelAnimationFrame(requestRef.current);
@@ -80,6 +88,10 @@ export const GazeProvider = ({ children }) => {
       }
     } catch (err) {
       console.error("Error accessing webcam:", err);
+      if (err.name === 'NotAllowedError') {
+        console.warn("Camera permission denied. Falling back to mouse simulation.");
+        setIsMouseSim(true);
+      }
     }
   };
 
@@ -88,6 +100,12 @@ export const GazeProvider = ({ children }) => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+      setWebcamStream(null);
+    }
+    if (faceLandmarkerRef.current) {
+      faceLandmarkerRef.current.close();
+      faceLandmarkerRef.current = null;
+      setIsModelLoaded(false);
     }
   };
 
@@ -98,19 +116,21 @@ export const GazeProvider = ({ children }) => {
     if (
       video &&
       landmarker &&
-      video.readyState >= 2 && // HAVE_CURRENT_DATA
+      video.readyState >= 2 &&
       video.videoWidth > 0 &&
+      video.videoHeight > 0 &&
       !video.paused &&
-      !video.ended
+      !video.ended &&
+      landmarker
     ) {
-      // Avoid processing the same frame multiple times
+
       if (video.currentTime !== lastVideoTimeRef.current) {
         lastVideoTimeRef.current = video.currentTime;
 
         try {
           let startTimeMs = performance.now();
 
-          // MediaPipe VIDEO mode requires strictly increasing timestamps
+
           if (startTimeMs <= lastTimestampRef.current) {
             startTimeMs = lastTimestampRef.current + 0.01;
           }
@@ -121,42 +141,56 @@ export const GazeProvider = ({ children }) => {
           if (results.faceLandmarks && results.faceLandmarks.length > 0) {
             const landmarks = results.faceLandmarks[0];
 
-            // --- 1. Get Iris Indices ---
+
             const leftIris = landmarks[468];
             const rightIris = landmarks[473];
 
-            // --- 2. Calculate Average Iris Position ---
+
             const avgIrisX = (leftIris.x + rightIris.x) / 2;
             const avgIrisY = (leftIris.y + rightIris.y) / 2;
 
-            // --- 3. Define Active Zone (Sensitivity Box) ---
-            // Adjust these to make it easier/harder to reach corners
-            const boxWidth = 0.25;  // 25% of camera width
-            const boxHeight = 0.25; // 25% of camera height
 
-            // Center of camera is 0.5, 0.5
+
+
+            const boxWidth = 0.1;
+            const boxHeight = 0.025;
+
+
+
+
+            const yOffset = 0.12;
+
+
             const minX = 0.5 - (boxWidth / 2);
             const maxX = 0.5 + (boxWidth / 2);
-            const minY = 0.5 - (boxHeight / 2);
-            const maxY = 0.5 + (boxHeight / 2);
+            const minY = (0.5) - (boxHeight / 2);
+            const maxY = (0.5 + yOffset) + (boxHeight / 2);
 
-            // --- 4. Map to Screen Coordinates ---
+
             let normalizedX = (avgIrisX - minX) / (maxX - minX);
             let normalizedY = (avgIrisY - minY) / (maxY - minY);
 
-            // Clamp values to 0-1
+
             normalizedX = Math.max(0, Math.min(1, normalizedX));
             normalizedY = Math.max(0, Math.min(1, normalizedY));
 
-            // Calculate Screen Pixels (Mirror X)
-            const screenX = (1 - normalizedX) * window.innerWidth;
-            const screenY = normalizedY * window.innerHeight;
 
-            // --- 5. Update Context State ---
+            const targetX = (1 - normalizedX) * window.innerWidth;
+            const targetY = normalizedY * window.innerHeight;
+
+
+            const SMOOTHING_FACTOR = 0.1;
+
+            const smoothX = prevGazeRef.current.x + (targetX - prevGazeRef.current.x) * SMOOTHING_FACTOR;
+            const smoothY = prevGazeRef.current.y + (targetY - prevGazeRef.current.y) * SMOOTHING_FACTOR;
+
+            prevGazeRef.current = { x: smoothX, y: smoothY };
+
+
             setGaze({
-              x: screenX,
-              y: screenY,
-              // Optional: Calculate Eye Distance for Z-axis
+              x: smoothX,
+              y: smoothY,
+
               distance: Math.sqrt(
                 Math.pow((leftIris.x - rightIris.x), 2) +
                 Math.pow((leftIris.y - rightIris.y), 2)
@@ -165,6 +199,10 @@ export const GazeProvider = ({ children }) => {
           }
         } catch (error) {
           console.error("MediaPipe detection error:", error);
+
+          if (requestRef.current) cancelAnimationFrame(requestRef.current);
+          requestRef.current = null;
+          return;
         }
       }
     }
@@ -175,10 +213,10 @@ export const GazeProvider = ({ children }) => {
   };
 
   return (
-    <GazeContext.Provider value={{ gaze, isMouseSim, setIsMouseSim, isModelLoaded }}>
+    <GazeContext.Provider value={{ gaze, isMouseSim, setIsMouseSim, isModelLoaded, webcamStream, stopEyeTracking }}>
       {children}
 
-      {/* Hidden Video Element for MediaPipe Processing */}
+
       <video
         ref={videoRef}
         autoPlay
@@ -188,10 +226,10 @@ export const GazeProvider = ({ children }) => {
           position: "absolute",
           top: 0,
           left: 0,
-          opacity: 0, // Hidden from view, but active in DOM
+          opacity: 0,
           pointerEvents: "none",
           zIndex: -1,
-          transform: "scaleX(-1)" // Mirror for consistency
+          transform: "scaleX(-1)"
         }}
       />
     </GazeContext.Provider>

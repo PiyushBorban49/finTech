@@ -6,8 +6,8 @@ export default function SSOCallback() {
     <>
         <div id='clerk-captcha'></div>
         <AuthenticateWithRedirectCallback 
-        signInForceRedirectUrl="/dashboard"
-        signUpForceRedirectUrl="/dashboard"
+        signInForceRedirectUrl="/"
+        signUpForceRedirectUrl="/"
         />
     </>
   );
